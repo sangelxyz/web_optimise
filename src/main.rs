@@ -1,10 +1,11 @@
 // TODO: Add command line options.
 // Path to convert.
-//
+// TODO: Add some filters, thumbnail creation.
 
 use image::{ImageError, DynamicImage};
 use image::io::Reader as ImageReader;
-use std::{fs,io};
+use std::{fs};
+use std::env;
 use std::path::Path;
 
 struct FasterImage {
@@ -24,10 +25,9 @@ enum ImageType {
 impl FasterImage {
     fn read_path (&mut self) {
         let paths = fs::read_dir(&self.source_path).unwrap();
-        //let image_file_name = path::
+
         for path in paths {
             let current_img: String = path.unwrap().path().display().to_string();
-
             let img_path = Path::new(&current_img);
             let file_stem = img_path.file_stem().unwrap();
             let current_file = file_stem.to_str();
@@ -92,21 +92,17 @@ fn main() {
     println!("Enter full path to image folder location to convert to webp");
     println!("Files are stored in the same path in a sub folder named optimised.");
 
-    let mut path_to_images = String::new();
+//    let mut path_to_images = String::new();
 
-    io::stdin()
-        .read_line(&mut path_to_images)
-        .expect("Failed to read input directory.");
+        let args: Vec<String> = env::args().collect();
+        dbg!(args);
 
     // attempt to create optimised folder.
-    
-
-
-    let mut fast = FasterImage {
-        source_path : format!("{}", path_to_images),
-        dest_path : format!("{}", path_to_images),
-        dest_type : ImageType::Webp,
-        source_image : None,
-    };
-    fast.read_path();
+    // let mut fast = FasterImage {
+    //     source_path : format!("{}", path_to_images),
+    //     dest_path : format!("{}", path_to_images),
+    //     dest_type : ImageType::Webp,
+    //     source_image : None,
+    // };
+    // fast.read_path();
 }
