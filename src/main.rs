@@ -1,6 +1,10 @@
+// TODO: Add command line options.
+// Path to convert.
+//
+
 use image::{ImageError, DynamicImage};
 use image::io::Reader as ImageReader;
-use std::fs;
+use std::{fs,io};
 use std::path::Path;
 
 struct FasterImage {
@@ -62,15 +66,14 @@ impl FasterImage {
             ImageType::Webp => "webp".to_string(),
         };
 
-
+        //FIX: Handle error correctly
         if let Some(file_handle) = self.source_image.as_ref() {
             println!("{}.{}", dest_file, file_extension);
             file_handle.save(format!("{}.{}", dest_file, file_extension))
             //Ok(())
         } else {
            Ok(()) 
-        }             //.save(file)?;
-        //Ok(())
+        } 
     }
 
     fn open_image(&self, file_path: &str) -> Result<DynamicImage, ImageError> {
@@ -86,18 +89,24 @@ impl FasterImage {
 }
 
 fn main() {
-    println!("Hello, world!");
+    println!("Enter full path to image folder location to convert to webp");
+    println!("Files are stored in the same path in a sub folder named optimised.");
+
+    let mut path_to_images = String::new();
+
+    io::stdin()
+        .read_line(&mut path_to_images)
+        .expect("Failed to read input directory.");
+
+    // attempt to create optimised folder.
+    
+
+
     let mut fast = FasterImage {
-        source_path : "/home/sangel/projects/images/".to_string(),
-        dest_path : "/home/sangel/projects/images/".to_string(),
+        source_path : format!("{}", path_to_images),
+        dest_path : format!("{}", path_to_images),
         dest_type : ImageType::Webp,
         source_image : None,
     };
     fast.read_path();
-
-    //let img2 = ImageReader::new(Cursor::new(bytes)).with_guessed_format()?.decode()?;
-
 }
-
-
-//fn open_image
