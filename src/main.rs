@@ -3,12 +3,14 @@
 use image::io::Reader as ImageReader;
 use image::{DynamicImage, ImageError};
 use reqwest::Client;
-use std::env;
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use bytes::Bytes;
 use url::Url;
+use chrono::{DateTime, Utc, TimeZone};
+use std::thread;
 
 struct FasterImage {
     source_image: Option<DynamicImage>,
@@ -21,6 +23,7 @@ struct FasterImage {
 enum ImageType {
     Webp,
     Jpg,
+    Jpeg,
     Png,
 }
 
@@ -92,6 +95,7 @@ impl FasterImage {
     ) -> Result<(), ImageError> {
         // destination file type
         let file_extension = match self.dest_type {
+            ImageType::Jpeg => "jpeg".to_string(),
             ImageType::Jpg => "jpg".to_string(),
             ImageType::Png => "png".to_string(),
             ImageType::Webp => "webp".to_string(),
@@ -132,18 +136,28 @@ struct CosmicResponse {
 struct Posts {
     slug: String,
     title: String,
+    modified_at: Option<String>,
     metadata: Option<MetaData>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 struct MetaData {
     hero: Option<Hero>,
+/*     published_date: String, */
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Hero {
     url: String,
 }
+
+
+fn parse_date(date_string: &str) -> i64 {
+    let datetime = DateTime::<Utc>::from(DateTime::parse_from_rfc3339(date_string).unwrap());
+    // Convert the DateTime<Utc> object to a Unix timestamp
+    datetime.timestamp()
+}
+
 
 #[tokio::main]
 async fn main() {
@@ -163,31 +177,70 @@ async fn main() {
     //     source_image: None,
     // };
     // fast.read_path();
+    //
+    const TEMP_DIR: &str = "/home/sangel/projects/js/cryptoalpha/public/images/temp/";
+    const IMAGES_DIR: &str = "/home/sangel/projects/js/cryptoalpha/public/images/";
+   
+    loop {
+        let mut modified: i64 = 0;
+        let mut run_update: bool = false;
 
-    let client = reqwest::Client::new();
-    //let response = get_api(&client, "/api/v4/spot/currency_pairs", Option::None).await;
-    let response = get_api(&client, "https://api.cosmicjs.com/v3/buckets/dexcelertae2-production/objects?read_key=FPp5lLS4a9dXwtur5SsZzYGuRaE7tuDFrQPYy6CzQyzHAK6ltt&limit=100", "", Option::None).await;
-    let response_body = response.text().await.unwrap();
-    let sanitized_response = response_body.trim();
-    let data = serde_json::from_str::<CosmicResponse>(sanitized_response);
-    
-    for item in data.unwrap().objects.iter() {
-        if let Some(meta_ob) = &item.metadata {
-            if let Some(hero) = &meta_ob.hero {
-                //println!("{:?}", hero.url);
-                let res = get_img(&client, hero.url.as_str()).await;
-                let img_bytes = res.bytes().await.unwrap();
-                let fname = res.url().path_segments().and_then(|segments| segments.last()).and_then(|name| if name.is_empty() { None } else { Some(name) }).unwrap();
-                //println!("{:?}", fname);
-                //Do i need to write ??????
-                //write_file(img_bytes, "/home/sangel/projects/images/temp.jpg".into());
+        let client = reqwest::Client::new();
+        //let response = get_api(&client, "/api/v4/spot/currency_pairs", Option::None).await;
+        let response = get_api(&client, "https://api.cosmicjs.com/v3/buckets/dexcelertae2-production/objects?read_key=FPp5lLS4a9dXwtur5SsZzYGuRaE7tuDFrQPYy6CzQyzHAK6ltt&limit=100", "", Option::None).await;
+        let response_body = response.text().await.unwrap();
+        let sanitized_response = response_body.trim();
+        let data = serde_json::from_str::<CosmicResponse>(sanitized_response);
+        
+        for item in data.unwrap().objects.iter() {
+            if let Some(modified_at) = &item.modified_at {
+                let stamp = parse_date(&modified_at);
+
+                if stamp > modified {
+                    modified = stamp;
+                    run_update = true;
+                }
+            }
+            if let Some(meta_ob) = &item.metadata {
+                    if let Some(hero) = &meta_ob.hero {
+                    //println!("{:?}", hero.url);
+                    let img_url = hero.url.as_str();
+                    let res = get_img(&client, &img_url.clone()).await;
+                    
+                    let parse_url = Url::parse(img_url.clone()).unwrap();
+                    if let Some(fname) = parse_url.path_segments() {
+                        if let Some(file) = fname.last() {
+                            let res_bytes = res.bytes().await;
+                            let file_extension = std::path::Path::new(&file);
+                            //println!("{:?}", file_extension.extension().unwrap());
+                            write_file(&res_bytes.unwrap(), format!("{}{}", TEMP_DIR, file));
+                            println!("{}",file);
+                            // attempt to create optimised folder.
+
+                        }
+                    }
+
+                }
             }
         }
-    }
 
+        if run_update {
+            // Optimise.
+            let mut fast = FasterImage {
+                source_path: format!("{}", TEMP_DIR),
+                dest_path: format!("{}", IMAGES_DIR),
+                dest_type: ImageType::Webp,
+                source_image: None,
+            };
+            fast.read_path();
+        }
+
+        thread::sleep(Duration::from_secs(60*10));
+
+    }
+    //remove_directory_contents(TEMP_DIR);
     //println!("{:?}", data.unwrap().objects);
 }
-
 
 fn extract_filename(url_string: &str) -> Option<String> {
     // Parse the URL
@@ -205,7 +258,7 @@ fn extract_filename(url_string: &str) -> Option<String> {
     Some(filename.to_string())
 }
 
-fn write_file(data: Bytes, file: String) {
+fn write_file(data: &Bytes, file: String) {
     print!("{}", file);
     fs::write(file, data).expect("Unable to write file");
 }

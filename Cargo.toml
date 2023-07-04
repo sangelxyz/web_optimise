@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 bytes = "1.4.0"
+chrono = "0.4.26"
 derive = "1.0.0"
 image = { version = "0.24.6", features = ["webp-encoder", "png", "avif"] }
 json = "0.12.4"
